@@ -8,12 +8,12 @@ from telethon.tl.types import ChatAdminRights
 # Load environment variables
 load_dotenv()
 
-api_id = int(os.getenv("API_ID"))
-api_hash = os.getenv("API_HASH")
-bot_token = os.getenv("BOT_TOKEN")
+api_id = int(os.getenv("26743856"))
+api_hash = os.getenv("d50d0c003c3ad56f27cc619074ab6d88")
+bot_token = os.getenv("7779600047:AAHnQUkZbnrWv0eMcqP_Q8OVYDnHYmzqKxI")
 
-FB_PAGE_ACCESS_TOKEN = os.getenv("FB_PAGE_ACCESS_TOKEN")
-FB_PAGE_ID = os.getenv("FB_PAGE_ID")
+FB_PAGE_ACCESS_TOKEN = os.getenv("EAAPRzu2yL54BPNe5bQWyoeIRczWkdbSR9wxUPv57FtZC3lNrNrTxL9jEleXrb51AbvSf36gZB4bCZBu3hr63SLhZAw2c37HqQKVRjZBHgxNamcrpNmGN84AkTFLCthtPIxT8ccEghplfFNsZBQA6ZB1n8gqSZAWey5J5GqxYDsddY92TELW1ZAZBkD0Eg8CSsXmldqNherbxsu")
+FB_PAGE_ID = os.getenv("688686637669419")
 
 logging.basicConfig(level=logging.INFO)
 
