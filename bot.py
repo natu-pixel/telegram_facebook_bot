@@ -1,51 +1,82 @@
 import os
 import logging
-from telethon import TelegramClient, events
 import requests
+from dotenv import load_dotenv
+from telethon import TelegramClient, events
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+
+# Load environment variables
+load_dotenv()
+
+# Telegram credentials from .env
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
+bot_token = os.getenv("BOT_TOKEN")
+
+# Facebook Page Access Token & Page ID
+FB_PAGE_ACCESS_TOKEN = os.getenv("FB_PAGE_ACCESS_TOKEN")
+FB_PAGE_ID = os.getenv("FB_PAGE_ID")
 
 # Logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-from dotenv import load_dotenv
-load_dotenv()
 
-# Load credentials from environment
-api_id = int(os.getenv("26743856"))
-api_hash = os.getenv("d50d0c003c3ad56f27cc619074ab6d88")
-bot_token = os.getenv("7779600047:AAHnQUkZbnrWv0eMcqP_Q8OVYDnHYmzqKxI")
-facebook_page_id = os.getenv("688686637669419")
-facebook_access_token = os.getenv("EAAPRzu2yL54BPFJLEHlIxxPtD9nudNAPBlhXh65zhX38S3s06TetmbWHLEJFWrnOOIUNNV6tZCUXBsmvqEYt009yyqOxqkyVdZCfOVt0SFWJPAJbD4HTDcWQYX0d5LhZAWQ9s4ZCH2klXyNtLTuqxNrtsRawrtHWhJwPT6ZCRJDEXhdWSqaR03RiP0NLZAeaNqaXac3vD3gF1Cewmx6Q23kruwdIFzwZCJPZCLFP2Llv")
-
-# Initialize the Telegram client with bot token
+# Telegram client (bot)
 client = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
-# Helper: Post to Facebook Page
-def post_to_facebook(text):
-    url = f"https://graph.facebook.com/{facebook_page_id}/feed"
-    data = {
-        'message': text,
-        'access_token': facebook_access_token
-    }
+# Helper: Post to Facebook
+def post_to_facebook(message, image_path=None):
     try:
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        logger.info("[facebook] Post successful")
-    except requests.exceptions.RequestException as e:
-        logger.info(f"[facebook] Failed to post text to Facebook: {e}")
+        if image_path:
+            url = f"https://graph.facebook.com/{FB_PAGE_ID}/photos"
+            with open(image_path, 'rb') as img:
+                files = {'source': img}
+                data = {
+                    'access_token': FB_PAGE_ACCESS_TOKEN,
+                    'caption': message
+                }
+                r = requests.post(url, data=data, files=files)
+        else:
+            url = f"https://graph.facebook.com/{FB_PAGE_ID}/feed"
+            data = {
+                'message': message,
+                'access_token': FB_PAGE_ACCESS_TOKEN
+            }
+            r = requests.post(url, data=data)
 
-# Listen to Telegram group messages
+        r.raise_for_status()
+        logging.info("[facebook] Successfully posted.")
+    except Exception as e:
+        logging.error(f"[facebook] Failed to post: {e}")
+
+# Telegram handler
 @client.on(events.NewMessage)
 async def handler(event):
-    try:
-        sender = await event.get_sender()
-        if event.is_group and sender and sender.bot is False and sender.username:
-            if sender.admin_rights or sender.participant.admin_rights:
-                message_text = event.message.message
-                if message_text:
-                    logger.info(f"[telegram] Forwarding message from admin: {message_text}")
-                    post_to_facebook(message_text)
-    except Exception as e:
-        logger.info(f"[telegram] Error handling Telegram message: {e}")
+    if not event.is_group:
+        return
 
-logger.info("Bot is running...")
+    sender = await event.get_sender()
+    sender_id = sender.id
+
+    # Check if user is admin
+    try:
+        admins = await client.get_participants(event.chat_id, filter=events.ChatParticipantsAdmins)
+        admin_ids = [admin.id for admin in admins]
+        if sender_id not in admin_ids:
+            logging.info("[telegram] Message ignored (not from admin).")
+            return
+    except Exception as e:
+        logging.error(f"[telegram] Failed to check admin status: {e}")
+        return
+
+    message_text = event.message.message or ""
+
+    # Download media if any
+    media_path = None
+    if event.message.media:
+        media_path = await event.message.download_media()
+
+    post_to_facebook(message_text, media_path)
+
+# Run the bot
+logging.info("Bot is running...")
 client.run_until_disconnected()
