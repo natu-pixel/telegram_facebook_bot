@@ -1,70 +1,49 @@
-from telethon.sync import TelegramClient, events
-import requests
 import os
+import logging
+from telethon import TelegramClient, events
+import requests
 
-# Telegram API setup
-api_id = 26743856
-api_hash = 'd50d0c003c3ad56f27cc619074ab6d88'
-group_id = -1002299729281 
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Facebook API setup
-page_access_token = '600334626243503|srgHoAsRJ5EM38bMQUaKyLmgV5k'
-page_id = '688686637669419'
+# Load credentials from environment
+api_id = int(os.getenv("26743856"))
+api_hash = os.getenv("d50d0c003c3ad56f27cc619074ab6d88")
+bot_token = os.getenv("7779600047:AAHnQUkZbnrWv0eMcqP_Q8OVYDnHYmzqKxI")
+facebook_page_id = os.getenv("688686637669419")
+facebook_access_token = os.getenv("EAAPRzu2yL54BPFJLEHlIxxPtD9nudNAPBlhXh65zhX38S3s06TetmbWHLEJFWrnOOIUNNV6tZCUXBsmvqEYt009yyqOxqkyVdZCfOVt0SFWJPAJbD4HTDcWQYX0d5LhZAWQ9s4ZCH2klXyNtLTuqxNrtsRawrtHWhJwPT6ZCRJDEXhdWSqaR03RiP0NLZAeaNqaXac3vD3gF1Cewmx6Q23kruwdIFzwZCJPZCLFP2Llv")
 
-client = TelegramClient('session_group', api_id, api_hash)
+# Initialize the Telegram client with bot token
+client = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
-def post_text(message):
-    url = f"https://graph.facebook.com/{page_id}/feed"
+# Helper: Post to Facebook Page
+def post_to_facebook(text):
+    url = f"https://graph.facebook.com/{facebook_page_id}/feed"
     data = {
-        'message': message,
-        'access_token': page_access_token
+        'message': text,
+        'access_token': facebook_access_token
     }
-    res = requests.post(url, data=data)
-    print("✅ Posted text:", res.json())
+    try:
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        logger.info("[facebook] Post successful")
+    except requests.exceptions.RequestException as e:
+        logger.info(f"[facebook] Failed to post text to Facebook: {e}")
 
-def post_photo(message, file_path):
-    url = f"https://graph.facebook.com/{page_id}/photos"
-    with open(file_path, 'rb') as img:
-        files = {'source': img}
-        data = {
-            'caption': message,
-            'access_token': page_access_token
-        }
-        res = requests.post(url, files=files, data=data)
-        print("✅ Posted photo:", res.json())
-
-def post_video(message, file_path):
-    url = f"https://graph.facebook.com/{page_id}/videos"
-    with open(file_path, 'rb') as vid:
-        files = {'source': vid}
-        data = {
-            'description': message,
-            'access_token': page_access_token
-        }
-        res = requests.post(url, files=files, data=data)
-        print("✅ Posted video:", res.json())
-
-@client.on(events.NewMessage(chats=group_id))
+# Listen to Telegram group messages
+@client.on(events.NewMessage)
 async def handler(event):
-    sender = await event.get_sender()
-    if not sender.bot and not sender.is_self and sender.is_admin:
-        message = event.message.message or ""
-        media = event.message.media
-        sender_name = getattr(sender, 'username', 'Unknown')
-        full_message = f"{sender_name}:\n{message}" if message else f"From {sender_name}"
+    try:
+        sender = await event.get_sender()
+        if event.is_group and sender and sender.bot is False and sender.username:
+            if sender.admin_rights or sender.participant.admin_rights:
+                message_text = event.message.message
+                if message_text:
+                    logger.info(f"[telegram] Forwarding message from admin: {message_text}")
+                    post_to_facebook(message_text)
+    except Exception as e:
+        logger.info(f"[telegram] Error handling Telegram message: {e}")
 
-        if media:
-            file_path = await event.message.download_media()
-            if file_path.endswith(('.jpg', '.jpeg', '.png')):
-                post_photo(full_message, file_path)
-            elif file_path.endswith(('.mp4', '.mov', '.avi')):
-                post_video(full_message, file_path)
-            else:
-                print("⚠️ Unsupported media type:", file_path)
-            os.remove(file_path)
-        else:
-            post_text(full_message)
-
-print("🚀 Bot is running...")
-client.start()
+logger.info("Bot is running...")
 client.run_until_disconnected()
