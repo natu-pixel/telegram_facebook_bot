@@ -6,6 +6,8 @@ import requests
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+load_dotenv()
 
 # Load credentials from environment
 api_id = int(os.getenv("26743856"))
