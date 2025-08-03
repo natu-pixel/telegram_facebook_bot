@@ -3,7 +3,8 @@ import logging
 import requests
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.functions.channels import GetParticipants
+from telethon.tl.types import ChannelParticipantsAdmins
 
 # Load environment variables
 load_dotenv()
@@ -48,7 +49,7 @@ def post_to_facebook(message, image_path=None):
     except Exception as e:
         logging.error(f"[facebook] Failed to post: {e}")
 
-# Telegram handler
+# Telegram message handler
 @client.on(events.NewMessage)
 async def handler(event):
     if not event.is_group:
@@ -57,26 +58,30 @@ async def handler(event):
     sender = await event.get_sender()
     sender_id = sender.id
 
-    # Check if user is admin
     try:
-        admins = await client.get_participants(event.chat_id, filter=events.ChatParticipantsAdmins)
-        admin_ids = [admin.id for admin in admins]
+        admins = await client(GetParticipants(
+            channel=event.chat_id,
+            filter=ChannelParticipantsAdmins(),
+            offset=0,
+            limit=100,
+            hash=0
+        ))
+        admin_ids = [user.participant.user_id for user in admins.users if hasattr(user, 'participant')]
         if sender_id not in admin_ids:
-            logging.info("[telegram] Message ignored (not from admin).")
+            logging.info("[telegram] Ignored (not from admin).")
             return
     except Exception as e:
         logging.error(f"[telegram] Failed to check admin status: {e}")
         return
 
     message_text = event.message.message or ""
-
-    # Download media if any
     media_path = None
+
     if event.message.media:
         media_path = await event.message.download_media()
 
     post_to_facebook(message_text, media_path)
 
-# Run the bot
+# Run bot
 logging.info("Bot is running...")
 client.run_until_disconnected()
