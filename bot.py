@@ -7,7 +7,6 @@ from telethon.tl.types import ChatAdminRights
 
 # Load environment variables
 load_dotenv()
-
 api_id = int(os.getenv("26743856"))
 api_hash = os.getenv("d50d0c003c3ad56f27cc619074ab6d88")
 bot_token = os.getenv("7779600047:AAHnQUkZbnrWv0eMcqP_Q8OVYDnHYmzqKxI")
